@@ -61,18 +61,18 @@ defmodule Message do
 
   @type filter_state :: :idle | :cleanBeforeFill | :cleanAfterFill | :fill | {:forcedIdle, number} | {:forcedClean, number} | {:forcedFill, number}
 
-  @spec decode_message(binary()) :: register() | heartbeat()
+  @spec decode_message(binary()) :: { :register | :heartbeat, register() | heartbeat() }
   def decode_message(bytes) do
     <<magic::binary-size(4), type, length::binary-size(4), body::binary>> = bytes
 
     length = :binary.decode_unsigned(length)
-    if length != byte_size(bytes) do raise :wrong_size end
-    if magic != <<0x0F, 0x0F, 0x0F, 0x00>> do raise :wrong_magic end
+    if length != byte_size(bytes) do raise "wrong_size" end
+    if magic != <<0xfa, 0xfa, 0xfa, 0xff>> do raise "wrong_magic" end
 
     case type do
-      0x01 -> decode_register(body)
-      0x03 -> decode_heartbeat(body)
-      _ -> raise :wrong_type
+      0x01 -> { :register, decode_register(body) }
+      0x03 -> { :heartbeat, decode_heartbeat(body) }
+      _ -> raise "wrong_type"
     end
 
   end
@@ -84,9 +84,7 @@ defmodule Message do
       type::binary-size(1),
       firmware::binary-size(2),
       needs_config::binary-size(1),
-      rest>> = body
-    IO.puts("checksum: " <> rest)
-
+      _rest::integer>> = body
     %{
       id: id,
       token: token,
@@ -109,8 +107,7 @@ defmodule Message do
       measurement_error_count::binary-size(4),
       leak::binary-size(1),
       leak_occured::binary-size(8),
-      rest>> = body
-    IO.puts("checksum: " <> rest)
+      _rest>> = body
 
     %{
       id: :binary.decode_unsigned(id),
@@ -137,8 +134,58 @@ defmodule Message do
       4 -> {:forcedFill, :binary.decode_unsigned(forced_time_left)}
       5 -> {:forcedClean, :binary.decode_unsigned(forced_time_left)}
       6 -> {:forcedIdle, :binary.decode_unsigned(forced_time_left)}
-      _ -> raise :wrong_state
+      _ -> raise "wrong_state"
     end
+  end
+
+  def encode_message(message) do
+    body = case message do
+      {:accepted, accepted} -> encode_accepted(accepted)
+      {:heartbeat_response, hb_response} -> encode_response(hb_response)
+      _ -> raise "Unknown message"
+    end
+    <<
+    0xfa, 0xfa, 0xfa, 0xff,
+    case message do
+      {:accepted, _} -> 0x02
+      {:heartbeat_response, _} -> 0x04
+      _ -> raise "Unknown message"
+    end,
+    byte_size(body)::integer-32,
+    body::binary
+    >>
+
+  end
+
+  def encode_accepted(accepted) do
+    if accepted.config_following do
+      config = encode_config(accepted.config)
+      <<
+      accepted.time::integer-64,
+      0x01,
+      config::binary
+      >>
+    else
+      <<
+      accepted.time::integer-64,
+      0x00
+      >>
+    end
+  end
+
+  @spec encode_config(config()) :: binary()
+  def encode_config(config) do
+    <<
+    config.waterlevel_fill_start::integer-64,
+    config.waterlevel_fill_end::integer-64,
+    config.clean_before_fill_duration::integer-64,
+    config.clean_after_fill_duration::integer-64,
+    config.leak_protection::integer-8
+    >>
+  end
+
+  def encode_response(_response) do
+    raise("unimplemented")
   end
 
 

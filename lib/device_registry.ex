@@ -9,9 +9,9 @@ defmodule DeviceRegistry do
     token: String.t,
     type: Integer.t,
     firmware_version: Integer.t,
-    waterlevel_history: [%{ time: integer, height: integer, state: filter_state() }],
+    waterlevel_history: [%{ time: integer, height: integer, state: Message.filter_state }],
     last_seen: integer,
-    config: device_config,
+    config: Message.config,
     measurement_error: boolean(),
     measurement_error_occured: integer(),
     measurement_error_count: integer(),
@@ -27,7 +27,7 @@ defmodule DeviceRegistry do
     :ets.insert(:device_registry, {device.id, device})
   end
 
-  @spec register_device(register_message()) :: no_return()
+  @spec register_device(Message.register()) :: no_return()
   def register_device(message) do
 
     current_timestamp = DateTime.utc_now(:milisecond)
@@ -84,7 +84,16 @@ defmodule DeviceRegistry do
     end
   end
 
-  @spec default_conf() :: device_config()
+  def get(id) do
+    case :ets.lookup(:device_registry, id) do
+      [{_id, device}] ->
+        device
+      [] ->
+        raise "Device not known"
+    end
+  end
+
+  @spec default_conf() :: Message.config()
   def default_conf() do
     %{
       waterlevel_fill_start: 500,
