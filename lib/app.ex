@@ -10,6 +10,7 @@ defmodule App do
     children = [
       DeviceRegistry,
       Supervisor.child_spec({Task, fn -> TcpServer.accept(4040) end}, restart: :permanent),
+      {Task.Supervisor, name: TcpServer.TaskSupervisor},
       {Bandit, plug: HttpEndpoint.Router},
     ]
 
