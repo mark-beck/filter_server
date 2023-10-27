@@ -15,7 +15,8 @@ require Logger
     Logger.info("waiting for connection")
     {:ok, client} = :gen_tcp.accept(socket)
     Logger.info("waiting for data")
-    data = :gen_tcp.recv(client, 0)
+    {:ok, data} = :gen_tcp.recv(client, 0)
+
     case Message.decode_message(data) do
       {:register, register} ->
         DeviceRegistry.register_device(register)
@@ -24,24 +25,24 @@ require Logger
           Logger.info("sending config")
           config = DeviceRegistry.get(register.id).config
           %{
-            time: DateTime.utc_now(:milisecond),
+            time: DateTime.utc_now(:millisecond) |> DateTime.to_unix(:millisecond),
             config_following: true,
             config: config
           }
         else
           Logger.info("sending no config")
           %{
-            time: DateTime.utc_now(:milisecond),
+            time: DateTime.utc_now(:milisecond) |> DateTime.to_unix(:millisecond),
             config_following: false,
           }
 
         end
         message = Message.encode_message({:accepted, accepted})
-        :gen_tcp.send(client, message)
+        :ok = :gen_tcp.send(client, message)
         :gen_tcp.close(client)
-
         loop_acceptor(socket)
       _ ->
+        :gen_tcp.close(client)
         Logger.info("got bad heartbeat")
         loop_acceptor(socket)
     end

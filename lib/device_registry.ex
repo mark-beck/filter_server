@@ -30,20 +30,20 @@ defmodule DeviceRegistry do
   @spec register_device(Message.register()) :: no_return()
   def register_device(message) do
 
-    current_timestamp = DateTime.utc_now(:milisecond)
+    current_timestamp = DateTime.utc_now(:millisecond)
 
     # check if device is already known
     device = case :ets.lookup(:device_registry, message.id) do
       [{_id, device}] ->
         # TODO: check if tokens match
-        %{ device | firmware: message.firmware_version, last_seen: current_timestamp}
+        %{ device | firmware_version: message.firmware_version, last_seen: current_timestamp}
       [] ->
         # TODO: validate token
         %{
           id: message.id,
           token: message.token,
           type: message.type,
-          firmware: message.firmware_version,
+          firmware_version: message.firmware_version,
           waterlevel_history: [],
           last_seen: current_timestamp,
           config: default_conf(),

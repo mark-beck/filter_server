@@ -1,5 +1,6 @@
 defmodule Message do
 
+  import Logger
   @type message_header :: %{
     magic: <<_::4, _::_*8>>,
     type: :register | :accepted | :heartbeat | :heartbeat_response,
@@ -61,19 +62,23 @@ defmodule Message do
 
   @type filter_state :: :idle | :cleanBeforeFill | :cleanAfterFill | :fill | {:forcedIdle, number} | {:forcedClean, number} | {:forcedFill, number}
 
-  @spec decode_message(binary()) :: { :register | :heartbeat, register() | heartbeat() }
+  @spec decode_message(binary()) :: { (:register | :heartbeat), (register() | heartbeat()) }
   def decode_message(bytes) do
     <<magic::binary-size(4), type, length::binary-size(4), body::binary>> = bytes
 
     length = :binary.decode_unsigned(length)
+    Logger.debug("length field: #{length}")
+    Logger.debug("length of array: #{byte_size(bytes)}")
     if length != byte_size(bytes) do raise "wrong_size" end
     if magic != <<0xfa, 0xfa, 0xfa, 0xff>> do raise "wrong_magic" end
 
-    case type do
+    result = case type do
       0x01 -> { :register, decode_register(body) }
       0x03 -> { :heartbeat, decode_heartbeat(body) }
       _ -> raise "wrong_type"
     end
+    Logger.info("decoded #{inspect(result)}")
+    result
 
   end
 
@@ -89,7 +94,7 @@ defmodule Message do
       id: id,
       token: token,
       type: :binary.decode_unsigned(type),
-      firmware: :binary.decode_unsigned(firmware),
+      firmware_version: :binary.decode_unsigned(firmware),
       needs_config: 1 == :binary.decode_unsigned(needs_config)
     }
   end
@@ -175,12 +180,13 @@ defmodule Message do
 
   @spec encode_config(config()) :: binary()
   def encode_config(config) do
+    leak_protection = if config.leak_protection do 1 else 0 end
     <<
     config.waterlevel_fill_start::integer-64,
     config.waterlevel_fill_end::integer-64,
     config.clean_before_fill_duration::integer-64,
     config.clean_after_fill_duration::integer-64,
-    config.leak_protection::integer-8
+    leak_protection::integer-8
     >>
   end
 
