@@ -96,7 +96,7 @@ defmodule Message do
         _ -> raise "wrong_type"
       end
 
-    Logger.info("decoded #{inspect(result)}")
+    Logger.debug("decoded #{inspect(result)}")
     result
   end
 

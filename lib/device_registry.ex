@@ -72,6 +72,9 @@ defmodule DeviceRegistry do
     # otherwise update
     case :ets.lookup(:device_registry, message.id) do
       [{_id, device}] ->
+        # send pubsub message
+        PubSub.publish("device:#{message.id}", {:update, message})
+
         command = device.command
         device = %{
           device

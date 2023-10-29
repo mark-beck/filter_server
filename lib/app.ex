@@ -9,6 +9,7 @@ defmodule App do
   def start(_type, _args) do
     children = [
       DeviceRegistry,
+      PubSub,
       Supervisor.child_spec({Task, fn -> TcpServer.accept(4040) end}, restart: :permanent),
       {Task.Supervisor, name: TcpServer.TaskSupervisor},
       {Bandit, plug: HttpEndpoint.Router},

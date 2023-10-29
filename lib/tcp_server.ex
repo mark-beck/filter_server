@@ -58,7 +58,7 @@ defmodule TcpServer do
         :gen_tcp.close(client)
 
       {:heartbeat, heartbeat} ->
-        Logger.info("Heartbeat from device #{heartbeat.id}")
+        Logger.debug("Heartbeat from device #{heartbeat.id}")
         command = DeviceRegistry.heartbeat_device(heartbeat)
 
         message = {:heartbeat_response, command} |> Message.encode_message

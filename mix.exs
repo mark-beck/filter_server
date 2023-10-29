@@ -26,8 +26,8 @@ defmodule FServer.MixProject do
       {:plug, "~> 1.15.1"},
       {:bandit, "~> 0.6"},
       {:poison, "~> 5.0"},
-      # {:dep_from_hexpm, "~> 0.3.0"},
-      # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
+      {:pubsub, "~> 1.1"},
+      {:websock_adapter, "~> 0.5.4"}
     ]
   end
 end
