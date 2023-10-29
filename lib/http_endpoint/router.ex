@@ -15,6 +15,19 @@ defmodule HttpEndpoint.Router do
     """)
   end
 
+  get "/device" do
+    devices = DeviceRegistry.get_device_ids()
+    send_resp(conn, 200, Poison.encode!(devices))
+  end
+
+  get "/device/:id" do
+    id = conn.params["id"]
+    device = DeviceRegistry.get(id)
+    # remove history to reduce payload size
+    device = Map.delete(device, :waterlevel_history)
+    send_resp(conn, 200, Poison.encode!(device))
+  end
+
   match _ do
     send_resp(conn, 404, "not found")
   end

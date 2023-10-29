@@ -21,6 +21,11 @@ defmodule DeviceRegistry do
 
   ## API
 
+  @spec get_device_ids() :: [integer()]
+  def get_device_ids() do
+    :ets.tab2list(:device_registry) |> Enum.map(fn {id, _} -> id end)
+  end
+
   @spec add_device(device_map()) :: true
   def add_device(device) do
     :ets.insert(:device_registry, {device.id, device})
