@@ -15,17 +15,18 @@ defmodule DeviceRegistry do
           measurement_error_occured: integer(),
           measurement_error_count: integer(),
           leak: boolean(),
-          leak_occured: integer()
+          leak_occured: integer(),
+          command: Message.heartbeat_response()
         }
 
   ## API
 
-  @spec add_device(device_map()) :: no_return()
+  @spec add_device(device_map()) :: true
   def add_device(device) do
     :ets.insert(:device_registry, {device.id, device})
   end
 
-  @spec register_device(Message.register()) :: no_return()
+  @spec register_device(Message.register()) :: true
   def register_device(message) do
     current_timestamp = DateTime.utc_now(:millisecond)
 
@@ -50,20 +51,23 @@ defmodule DeviceRegistry do
             measurement_error_occured: 0,
             measurement_error_count: 0,
             leak: false,
-            leak_occured: 0
+            leak_occured: 0,
+            command: %{ command_type: :none }
           }
       end
 
     :ets.insert(:device_registry, {message.id, device})
   end
 
+  @spec heartbeat_device(Message.heartbeat()) :: Message.heartbeat_response()
   def heartbeat_device(message) do
-    current_timestamp = DateTime.utc_now(:milisecond)
+    current_timestamp = DateTime.utc_now(:millisecond)
 
     # raise if device is not known
     # otherwise update
     case :ets.lookup(:device_registry, message.id) do
       [{_id, device}] ->
+        command = device.command
         device = %{
           device
           | last_seen: current_timestamp,
@@ -80,10 +84,24 @@ defmodule DeviceRegistry do
             measurement_error_occured: message.measurement_error_occured,
             measurement_error_count: message.measurement_error_count,
             leak: message.leak,
-            leak_occured: message.leak_occured
+            leak_occured: message.leak_occured,
+            command: %{ command_type: :none }
         }
 
         :ets.insert(:device_registry, {message.id, device})
+        command
+
+      [] ->
+        raise "Device not known"
+    end
+  end
+
+  def set_command(id, command) do
+    case :ets.lookup(:device_registry, id) do
+      [{_id, device}] ->
+        device = %{device | command: command}
+
+        :ets.insert(:device_registry, {id, device})
 
       [] ->
         raise "Device not known"

@@ -20,7 +20,6 @@ defmodule TcpServer do
   end
 
   defp loop_acceptor(socket) do
-    Logger.info("waiting for connection")
     {:ok, client} = :gen_tcp.accept(socket)
 
     {:ok, pid} = Task.Supervisor.start_child(TcpServer.TaskSupervisor, fn -> serve(client) end)
@@ -29,16 +28,16 @@ defmodule TcpServer do
   end
 
   defp serve(client) do
-    Logger.info("waiting for data")
+    Logger.debug("waiting for data")
     {:ok, data} = :gen_tcp.recv(client, 0)
 
     case Message.decode_message(data) do
       {:register, register} ->
+        Logger.info("Registering device #{register.id}")
         DeviceRegistry.register_device(register)
 
         accepted =
           if register.needs_config do
-            Logger.info("sending config")
             config = DeviceRegistry.get(register.id).config
 
             %{
@@ -47,7 +46,6 @@ defmodule TcpServer do
               config: config
             }
           else
-            Logger.info("sending no config")
 
             %{
               time: DateTime.utc_now(:milisecond) |> DateTime.to_unix(:millisecond),
@@ -59,9 +57,15 @@ defmodule TcpServer do
         :ok = :gen_tcp.send(client, message)
         :gen_tcp.close(client)
 
-      _ ->
+      {:heartbeat, heartbeat} ->
+        Logger.info("Heartbeat from device #{heartbeat.id}")
+        command = DeviceRegistry.heartbeat_device(heartbeat)
+
+        message = {:heartbeat_response, command} |> Message.encode_message
+
+        :gen_tcp.send(client, message)
+
         :gen_tcp.close(client)
-        Logger.info("got bad heartbeat")
     end
   end
 end

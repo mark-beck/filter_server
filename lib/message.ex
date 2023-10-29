@@ -1,5 +1,5 @@
 defmodule Message do
-  import Logger
+  require Logger
 
   @type message_header :: %{
           magic: <<_::4, _::_*8>>,
@@ -30,7 +30,7 @@ defmodule Message do
         }
 
   @type heartbeat :: %{
-          id: integer(),
+          id: String.t(),
           time: integer(),
           filter_state: filter_state(),
           last_state_change: integer(),
@@ -80,8 +80,6 @@ defmodule Message do
     <<magic::binary-size(4), type, length::binary-size(4), body::binary>> = bytes
 
     length = :binary.decode_unsigned(length)
-    Logger.debug("length field: #{length}")
-    Logger.debug("length of array: #{byte_size(bytes)}")
 
     if length != byte_size(bytes) do
       raise "wrong_size"
@@ -125,7 +123,7 @@ defmodule Message do
       leak::binary-size(1), leak_occured::binary-size(8), _rest>> = body
 
     %{
-      id: :binary.decode_unsigned(id),
+      id: id,
       time: :binary.decode_unsigned(time),
       filter_state: decode_filter_state(state, forced_time_left),
       last_state_change: :binary.decode_unsigned(last_state_change),
@@ -168,7 +166,6 @@ defmodule Message do
       case message do
         {:accepted, _} -> 0x02
         {:heartbeat_response, _} -> 0x04
-        _ -> raise "Unknown message"
       end,
       byte_size(body)::integer-32,
       body::binary
@@ -210,7 +207,65 @@ defmodule Message do
     >>
   end
 
-  def encode_response(_response) do
-    raise("unimplemented")
+  def encode_response(%{command_type: :none}) do
+    <<0x00>>
   end
+
+  def encode_response(%{command_type: :force_state, payload: payload}) do
+    state = case payload.state do
+      :idle -> 0x00
+      :clean -> 0x01
+      :fill -> 0x02
+    end
+
+    <<
+      0x01,
+      state::integer-8,
+      payload.time::integer-64
+    >>
+  end
+
+  def encode_response(%{command_type: :resync_time, payload: payload}) do
+    <<
+      0x02,
+      payload.time::integer-64
+    >>
+  end
+
+  def encode_response(%{command_type: :update_config, payload: payload}) do
+    config = encode_config(payload)
+
+    <<
+      0x03,
+      config::binary
+    >>
+  end
+
+  def encode_response(%{command_type: :set_reset_leak, payload: payload}) do
+    <<
+      0x04,
+      payload.leak::integer-8
+    >>
+  end
+
+  def encode_response(%{command_type: :reset_measurement_error}) do
+    <<
+      0x05
+    >>
+  end
+
+  # TODO: Implement firmware updating logic
+  def encode_response(%{command_type: :load_firmware}) do
+    <<
+      0x06
+    >>
+    raise "Not implemented"
+  end
+
+  def encode_response(%{command_type: :reset_device}) do
+    <<
+      0x07
+    >>
+  end
+
 end
