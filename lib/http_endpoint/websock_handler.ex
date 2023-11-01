@@ -20,7 +20,8 @@ require Logger
     {:noreply, state}
   end
 
-  def terminate(:timeout, state) do
+  def terminate(reason, state) do
+    Logger.info("Terminating websocket handler #{inspect(state)}, reason: #{inspect(reason)}")
     {:ok, state}
   end
 

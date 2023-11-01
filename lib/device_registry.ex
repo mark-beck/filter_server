@@ -3,19 +3,27 @@ defmodule DeviceRegistry do
 
   ## Types
 
-  @type device_map :: %{
-          id: String.t(),
-          token: String.t(),
-          type: Integer.t(),
-          firmware_version: Integer.t(),
-          waterlevel_history: [%{time: integer, height: integer, state: Message.filter_state()}],
-          last_seen: integer,
-          config: Message.config(),
+  @type device_state :: %{
+          time: integer(),
+          filter_state: Message.filter_state(),
+          last_state_change: integer(),
+          waterlevel: integer(),
           measurement_error: boolean(),
           measurement_error_occured: integer(),
           measurement_error_count: integer(),
           leak: boolean(),
-          leak_occured: integer(),
+          leak_occured: integer()
+  }
+
+  @type device_map :: %{
+          id: String.t(),
+          name: String.t() | nil,
+          token: String.t(),
+          type: Integer.t(),
+          firmware_version: Integer.t(),
+          state_history: [device_state()],
+          last_seen: integer,
+          config: Message.config(),
           command: Message.heartbeat_response()
         }
 
@@ -33,7 +41,7 @@ defmodule DeviceRegistry do
 
   @spec register_device(Message.register()) :: true
   def register_device(message) do
-    current_timestamp = DateTime.utc_now(:millisecond)
+    current_timestamp = DateTime.utc_now(:millisecond) |> DateTime.to_unix(:millisecond)
 
     # check if device is already known
     device =
@@ -46,17 +54,13 @@ defmodule DeviceRegistry do
           # TODO: validate token
           %{
             id: message.id,
+            name: nil,
             token: message.token,
             type: message.type,
             firmware_version: message.firmware_version,
-            waterlevel_history: [],
+            state_history: [],
             last_seen: current_timestamp,
             config: default_conf(),
-            measurement_error: false,
-            measurement_error_occured: 0,
-            measurement_error_count: 0,
-            leak: false,
-            leak_occured: 0,
             command: %{ command_type: :none }
           }
       end
@@ -66,7 +70,7 @@ defmodule DeviceRegistry do
 
   @spec heartbeat_device(Message.heartbeat()) :: Message.heartbeat_response()
   def heartbeat_device(message) do
-    current_timestamp = DateTime.utc_now(:millisecond)
+    current_timestamp = DateTime.utc_now(:millisecond) |> DateTime.to_unix(:millisecond)
 
     # raise if device is not known
     # otherwise update
@@ -79,25 +83,37 @@ defmodule DeviceRegistry do
         device = %{
           device
           | last_seen: current_timestamp,
-            waterlevel_history:
-              device.waterlevel_history ++
+            state_history:
+              device.state_history ++
                 [
                   %{
                     time: current_timestamp,
                     height: message.waterlevel,
-                    state: message.filter_state
+                    state: message.filter_state,
+                    measurement_error: message.measurement_error,
+                    measurement_error_occured: message.measurement_error_occured,
+                    measurement_error_count: message.measurement_error_count,
+                    leak: message.leak,
+                    leak_occured: message.leak_occured,
                   }
                 ],
-            measurement_error: message.measurement_error,
-            measurement_error_occured: message.measurement_error_occured,
-            measurement_error_count: message.measurement_error_count,
-            leak: message.leak,
-            leak_occured: message.leak_occured,
             command: %{ command_type: :none }
         }
 
         :ets.insert(:device_registry, {message.id, device})
         command
+
+      [] ->
+        raise "Device not known"
+    end
+  end
+
+  def set_name(id, name) do
+    case :ets.lookup(:device_registry, id) do
+      [{_id, device}] ->
+        device = %{device | name: name}
+
+        :ets.insert(:device_registry, {id, device})
 
       [] ->
         raise "Device not known"

@@ -213,9 +213,9 @@ defmodule Message do
 
   def encode_response(%{command_type: :force_state, payload: payload}) do
     state = case payload.state do
-      :idle -> 0x00
-      :clean -> 0x01
-      :fill -> 0x02
+      "idle" -> 0x00
+      "clean" -> 0x01
+      "fill" -> 0x02
     end
 
     <<
