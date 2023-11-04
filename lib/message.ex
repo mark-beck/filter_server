@@ -71,9 +71,9 @@ defmodule Message do
           | :cleanBeforeFill
           | :cleanAfterFill
           | :fill
-          | {:forcedIdle, number}
-          | {:forcedClean, number}
-          | {:forcedFill, number}
+          | :forcedIdle
+          | :forcedClean
+          | :forcedFill
 
   @spec decode_message(binary()) :: {:register | :heartbeat, register() | heartbeat()}
   def decode_message(bytes) do

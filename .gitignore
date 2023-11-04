@@ -30,3 +30,5 @@ erl_crash.dump
 # Ignore all local history of files
 .history
 .ionide
+
+device_registry

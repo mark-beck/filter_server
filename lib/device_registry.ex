@@ -6,6 +6,7 @@ defmodule DeviceRegistry do
   @type device_state :: %{
           time: integer(),
           filter_state: Message.filter_state(),
+          forced_time_left: integer(),
           last_state_change: integer(),
           waterlevel: integer(),
           measurement_error: boolean(),
@@ -18,6 +19,7 @@ defmodule DeviceRegistry do
   @type device_map :: %{
           id: String.t(),
           name: String.t() | nil,
+          baseline: integer() | nil,
           token: String.t(),
           type: Integer.t(),
           firmware_version: Integer.t(),
@@ -88,8 +90,9 @@ defmodule DeviceRegistry do
                 [
                   %{
                     time: current_timestamp,
-                    height: message.waterlevel,
-                    state: message.filter_state,
+                    waterlevel: message.waterlevel,
+                    filter_state: message.filter_state,
+                    last_state_change: message.last_state_change,
                     measurement_error: message.measurement_error,
                     measurement_error_occured: message.measurement_error_occured,
                     measurement_error_count: message.measurement_error_count,
@@ -161,7 +164,12 @@ defmodule DeviceRegistry do
 
   @impl true
   def init(state) do
-    :ets.new(:device_registry, [:named_table, :public])
+    case SaveRegistry.restore_registry() do
+      {:ok, _} ->
+        :ok
+      {:error, _} ->
+        :ets.new(:device_registry, [:named_table, :public])
+    end
     {:ok, state}
   end
 end

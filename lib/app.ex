@@ -8,6 +8,7 @@ defmodule App do
   @impl true
   def start(_type, _args) do
     children = [
+      SaveRegistry,
       DeviceRegistry,
       PubSub,
       Supervisor.child_spec({Task, fn -> TcpServer.accept(4040) end}, restart: :permanent),

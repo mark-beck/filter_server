@@ -45,7 +45,7 @@ defmodule HttpEndpoint.Apiv1.Router do
         <meta charset="utf-8">
         <title>WebSocket</title>
         <script>
-          sock  = new WebSocket("ws://localhost:4000/device/#{id}/ws")
+          sock  = new WebSocket("ws://localhost:4000/api/v1/device/#{id}/ws")
           sock.addEventListener("message", console.log)
           sock.addEventListener("open", () => sock.send("ping"))
         </script>
@@ -78,6 +78,7 @@ defmodule HttpEndpoint.Apiv1.Router do
     else
       history
     end
+    Logger.debug("History: #{inspect(history)}")
 
     send_resp(conn, 200, Poison.encode!(history))
   end
@@ -85,7 +86,7 @@ defmodule HttpEndpoint.Apiv1.Router do
   get "device/:id/history/last" do
     id = conn.params["id"]
     device = DeviceRegistry.get(id)
-    history = device.device_history
+    history = device.state_history
     last = List.last(history)
     send_resp(conn, 200, Poison.encode!(last))
   end
@@ -94,7 +95,7 @@ defmodule HttpEndpoint.Apiv1.Router do
     id = conn.params["id"]
     count = String.to_integer(conn.params["count"])
     device = DeviceRegistry.get(id)
-    history = device.device_history |> Enum.reverse |> Enum.take(count) |> Enum.reverse
+    history = device.state_history |> Enum.reverse |> Enum.take(count) |> Enum.reverse
     send_resp(conn, 200, Poison.encode!(history))
   end
 
