@@ -87,7 +87,8 @@ defmodule HttpEndpoint.Apiv1.Router do
     id = conn.params["id"]
     device = DeviceRegistry.get(id)
     history = device.state_history
-    last = List.last(history)
+    # Lists are reversed, so we actually get the first element
+    last = List.first(history)
     send_resp(conn, 200, Poison.encode!(last))
   end
 
@@ -95,14 +96,23 @@ defmodule HttpEndpoint.Apiv1.Router do
     id = conn.params["id"]
     count = String.to_integer(conn.params["count"])
     device = DeviceRegistry.get(id)
-    history = device.state_history |> Enum.reverse |> Enum.take(count) |> Enum.reverse
+    history = device.state_history |> Enum.take(count)
     send_resp(conn, 200, Poison.encode!(history))
   end
+
+  ## TODO: convert both set commands to POST
 
   get "device/:id/setname/:name" do
     id = conn.params["id"]
     name = conn.params["name"]
     DeviceRegistry.set_name(id, name)
+    send_resp(conn, 200, "")
+  end
+
+  get "device/:id/setbaseline/:num" do
+    id = conn.params["id"]
+    num = conn.params["num"] |> String.to_integer
+    DeviceRegistry.set_baseline(id, num)
     send_resp(conn, 200, "")
   end
 

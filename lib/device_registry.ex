@@ -14,7 +14,7 @@ defmodule DeviceRegistry do
           measurement_error_count: integer(),
           leak: boolean(),
           leak_occured: integer()
-  }
+        }
 
   @type device_map :: %{
           id: String.t(),
@@ -57,13 +57,14 @@ defmodule DeviceRegistry do
           %{
             id: message.id,
             name: nil,
+            baseline: nil,
             token: message.token,
             type: message.type,
             firmware_version: message.firmware_version,
             state_history: [],
             last_seen: current_timestamp,
             config: default_conf(),
-            command: %{ command_type: :none }
+            command: %{command_type: :none}
           }
       end
 
@@ -82,25 +83,25 @@ defmodule DeviceRegistry do
         PubSub.publish("device:#{message.id}", {:update, message})
 
         command = device.command
+
         device = %{
           device
           | last_seen: current_timestamp,
-            state_history:
-              device.state_history ++
-                [
-                  %{
-                    time: current_timestamp,
-                    waterlevel: message.waterlevel,
-                    filter_state: message.filter_state,
-                    last_state_change: message.last_state_change,
-                    measurement_error: message.measurement_error,
-                    measurement_error_occured: message.measurement_error_occured,
-                    measurement_error_count: message.measurement_error_count,
-                    leak: message.leak,
-                    leak_occured: message.leak_occured,
-                  }
-                ],
-            command: %{ command_type: :none }
+            state_history: [
+              %{
+                time: current_timestamp,
+                waterlevel: message.waterlevel,
+                filter_state: message.filter_state,
+                last_state_change: message.last_state_change,
+                measurement_error: message.measurement_error,
+                measurement_error_occured: message.measurement_error_occured,
+                measurement_error_count: message.measurement_error_count,
+                leak: message.leak,
+                leak_occured: message.leak_occured
+              }
+              | device.state_history
+            ],
+            command: %{command_type: :none}
         }
 
         :ets.insert(:device_registry, {message.id, device})
@@ -111,6 +112,7 @@ defmodule DeviceRegistry do
     end
   end
 
+  @spec set_name(String.t(), String.t()) :: true
   def set_name(id, name) do
     case :ets.lookup(:device_registry, id) do
       [{_id, device}] ->
@@ -123,6 +125,20 @@ defmodule DeviceRegistry do
     end
   end
 
+  @spec set_baseline(String.t(), integer()) :: true
+  def set_baseline(id, baseline) do
+    case :ets.lookup(:device_registry, id) do
+      [{_id, device}] ->
+        device = %{device | baseline: baseline}
+
+        :ets.insert(:device_registry, {id, device})
+
+      [] ->
+        raise "Device not known"
+    end
+  end
+
+  @spec set_command(String.t(), Message.heartbeat_response()) :: true
   def set_command(id, command) do
     case :ets.lookup(:device_registry, id) do
       [{_id, device}] ->
@@ -135,6 +151,7 @@ defmodule DeviceRegistry do
     end
   end
 
+  @spec get(String.t()) :: device_map()
   def get(id) do
     case :ets.lookup(:device_registry, id) do
       [{_id, device}] ->
@@ -167,9 +184,11 @@ defmodule DeviceRegistry do
     case SaveRegistry.restore_registry() do
       {:ok, _} ->
         :ok
+
       {:error, _} ->
         :ets.new(:device_registry, [:named_table, :public])
     end
+
     {:ok, state}
   end
 end

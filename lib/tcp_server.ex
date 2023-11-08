@@ -31,41 +31,40 @@ defmodule TcpServer do
     Logger.debug("waiting for data")
     {:ok, data} = :gen_tcp.recv(client, 0)
 
-    case Message.decode_message(data) do
-      {:register, register} ->
-        Logger.info("Registering device #{register.id}")
-        DeviceRegistry.register_device(register)
+    response =
+      case Message.decode_message(data) do
+        {:register, register} -> handle_register(register)
+        {:heartbeat, heartbeat} -> handle_heartbeat(heartbeat)
+      end
 
-        accepted =
-          if register.needs_config do
-            config = DeviceRegistry.get(register.id).config
+    :ok = :gen_tcp.send(client, response)
+    :gen_tcp.close(client)
+  end
 
-            %{
-              time: DateTime.utc_now(:millisecond) |> DateTime.to_unix(:millisecond),
-              config_following: true,
-              config: config
-            }
-          else
+  defp handle_register(register) do
+    Logger.info("Registering device #{register.id}")
+    DeviceRegistry.register_device(register)
 
-            %{
-              time: DateTime.utc_now(:milisecond) |> DateTime.to_unix(:millisecond),
-              config_following: false
-            }
-          end
+    accepted =
+      if register.needs_config do
+        %{
+          time: DateTime.utc_now(:millisecond) |> DateTime.to_unix(:millisecond),
+          config_following: true,
+          config: DeviceRegistry.get(register.id).config
+        }
+      else
+        %{
+          time: DateTime.utc_now(:milisecond) |> DateTime.to_unix(:millisecond),
+          config_following: false
+        }
+      end
 
-        message = Message.encode_message({:accepted, accepted})
-        :ok = :gen_tcp.send(client, message)
-        :gen_tcp.close(client)
+    {:accepted, accepted} |> Message.encode_message
+  end
 
-      {:heartbeat, heartbeat} ->
-        Logger.debug("Heartbeat from device #{heartbeat.id}")
-        command = DeviceRegistry.heartbeat_device(heartbeat)
-
-        message = {:heartbeat_response, command} |> Message.encode_message
-
-        :gen_tcp.send(client, message)
-
-        :gen_tcp.close(client)
-    end
+  defp handle_heartbeat(heartbeat) do
+    Logger.debug("Heartbeat from device #{heartbeat.id}")
+    command = DeviceRegistry.heartbeat_device(heartbeat)
+    {:heartbeat_response, command} |> Message.encode_message
   end
 end
